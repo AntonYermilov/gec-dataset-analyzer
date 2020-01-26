@@ -1,0 +1,7 @@
+pandas
+lxml
+nltk
+cython
+numpy
+scipy
+tqdm

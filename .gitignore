@@ -127,3 +127,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# project specific resources
+resources/original_datasets/
+resources/preprocessed_datasets/
+resources/metrics/
+analyzer/metrics/*.c
+analyzer/metrics/*.html
+analyzer/metrics/*.so
+build/
+.idea/
+.DS_Store
