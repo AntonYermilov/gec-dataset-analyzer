@@ -13,25 +13,41 @@ class DatasetNotFoundError(ValueError):
 
 
 class Dataset:
-    def __init__(self, dataset_name: str):
+    def __init__(self, dataset_name: str, only_edited: bool, sample_rate: float):
         self._dataset_name = dataset_name
         self._dataset_path = Path('resources', 'preprocessed_datasets', dataset_name, 'dataset.tsv')
         if not self._dataset_path.exists():
             raise DatasetNotFoundError(dataset_name)
-
+        self._only_edited = only_edited
         self._dataset: Optional[pd.DataFrame] = None
         self._vocab: Optional[Dict[str, int]] = None
+        self._sample_rate = sample_rate
 
-    def load(self):
+    def load(self, load_vocab: bool = True):
         print(f'Loading `{self._dataset_name}` dataset')
+
         self._dataset = pd.read_csv(self._dataset_path, index_col=False, sep='\t').replace(np.nan, '', regex=True)
-        self._vocab = set()
-        for ind, row in tqdm(self._dataset.iterrows(), total=len(self._dataset)):
-            for word in word_tokenize(row['original_sent']):
-                self._vocab.add(word)
-            for word in word_tokenize(row['edited_sent']):
-                self._vocab.add(word)
-        self._vocab = dict((word, ind) for ind, word in enumerate(self._vocab))
+        if self._only_edited:
+            mask = self._dataset['original_sent'] != self._dataset['edited_sent']
+            self._dataset = self._dataset[mask]
+
+        # mask = np.zeros(len(self._dataset), dtype=np.bool)
+        # mask[:5000] = True
+        # self._dataset = self._dataset[mask]
+
+        probs = np.random.uniform(0, 1, len(self._dataset))
+        mask = probs <= self._sample_rate
+        self._dataset = self._dataset[mask]
+
+        if load_vocab:
+            vocab = set()
+            for ind, row in tqdm(self._dataset.iterrows(), total=len(self._dataset)):
+                for word in word_tokenize(row['original_sent']):
+                    vocab.add(word)
+                for word in word_tokenize(row['edited_sent']):
+                    vocab.add(word)
+            self._vocab = dict((word, ind) for ind, word in enumerate(vocab))
+
         return self
 
     def get_dataset_name(self) -> str:

@@ -1,8 +1,9 @@
 import sys
 import argparse
 from pathlib import Path
+from typing import Optional
 from preprocessor import get_dataset_preprocessor, DatasetPreprocessorNotFoundError
-from analyzer import get_dataset_processor, DatasetNotFoundError
+from metric_analyzer import get_dataset_processor, DatasetNotFoundError
 
 
 def preprocess_dataset(dataset_name: str, dataset_path: str):
@@ -23,28 +24,39 @@ def preprocess_dataset(dataset_name: str, dataset_path: str):
 
 
 def parse_preprocess_command():
-    parser = argparse.ArgumentParser(usage='run.py [-h] preprocess --dataset {aesw,lang8,fce,jfleg} '
-                                           '--dataset_path DATASET_PATH')
-    parser.add_argument('--dataset', choices=['aesw', 'lang8', 'fce', 'jfleg'], type=str, required=True, help='dataset name')
-    parser.add_argument('--dataset_path', type=str, required=True, help='a path to the directory with specified dataset')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', choices=['aesw', 'lang8', 'fce', 'jfleg'], type=str, required=True,
+                        help='dataset name')
+    parser.add_argument('--dataset_path', type=str, required=True,
+                        help='a path to the directory with specified dataset')
     args = parser.parse_args(sys.argv[2:])
     preprocess_dataset(args.dataset, args.dataset_path)
 
 
-def process_dataset(dataset_name: str):
+def process_dataset(dataset_name: str, only_edited: bool, sample_rate: float, extract_edits: bool):
     try:
-        dataset_processor = get_dataset_processor(dataset_name)
+        dataset_processor = get_dataset_processor(dataset_name, only_edited, sample_rate)
     except DatasetNotFoundError as err:
         print(err.message, file=sys.stderr)
         return
-    dataset_processor.compute_metrics()
+    if extract_edits:
+        dataset_processor.extract_edits()
+    else:
+        dataset_processor.compute_metrics()
 
 
 def parse_analyze_command():
-    parser = argparse.ArgumentParser(usage='run.py [-h] analyze --dataset {aesw,lang8,fce,jfleg}')
-    parser.add_argument('--dataset', choices=['aesw', 'lang8', 'fce', 'jfleg'], type=str, required=True, help='dataset name')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', choices=['aesw', 'lang8', 'fce', 'jfleg', 'papeeria'], type=str, required=True,
+                        help='dataset name')
+    parser.add_argument('--only-edited', action='store_true',
+                        help='use only pairs of sentences with edits')
+    parser.add_argument('--sample-rate', type=float, default=1.0,
+                        help='use only pairs of sentences with edits')
+    parser.add_argument('--extract-edits', action='store_true',
+                        help='extract sentences with substitutions')
     args = parser.parse_args(sys.argv[2:])
-    process_dataset(args.dataset)
+    process_dataset(args.dataset, args.only_edited, args.sample_rate, args.extract_edits)
 
 
 def get_action_type():
@@ -66,7 +78,10 @@ def main():
             '    --dataset {aesw,lang8,fce,jfleg}\n'
             '    --dataset_path DATASET_PATH\n'
             '  analyze\n'
-            '    --dataset {aesw,lang8,fce,jfleg}'
+            '    --dataset {aesw,lang8,fce,jfleg,papeeria}\n'
+            '    [--only-edited]\n'
+            '    [--sample-rate RATE]\n'
+            '    [--extract-subst]\n'
         )
         return
 
@@ -80,6 +95,7 @@ def main():
 def install_dependencies():
     try:
         from nltk import word_tokenize
+        word_tokenize('Hello world!')
     except:
         import ssl
         try:
@@ -88,7 +104,6 @@ def install_dependencies():
             pass
         else:
             ssl._create_default_https_context = _create_unverified_https_context
-
         try:
             import nltk
             print('Installing nltk.punkt')
